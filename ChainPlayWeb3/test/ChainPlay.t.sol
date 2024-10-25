@@ -31,7 +31,8 @@ contract GamingGrantPlatformTest is Test {
         platform.createGrant{value: totalAmount}(
             "GameDev Fund",
             totalAmount,
-            duration
+            duration,
+            "ipfs://QmX8"
         );
 
         GamingGrantPlatform.Grant memory grant = platform.getGrant(1);
@@ -48,7 +49,14 @@ contract GamingGrantPlatformTest is Test {
         testCreateGrant();
 
         vm.startPrank(developer1);
-        platform.submitGame(1, "GameOne", "An adventure game");
+        platform.submitGame(
+            1,
+            "GameOne",
+            "An adventure game",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
         GamingGrantPlatform.Game memory game = platform.getGame(1);
 
         assertEq(game.name, "GameOne");
@@ -63,7 +71,14 @@ contract GamingGrantPlatformTest is Test {
 
         vm.startPrank(developer1);
         vm.expectRevert(abi.encodeWithSignature("GameAlreadySubmitted()"));
-        platform.submitGame(1, "Another Game", "An RPG experience");
+        platform.submitGame(
+            1,
+            "Another Game",
+            "An RPG experience",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
         vm.stopPrank();
     }
 
@@ -94,11 +109,19 @@ contract GamingGrantPlatformTest is Test {
         platform.createGrant{value: 100 ether}(
             "Test Grant",
             100 ether,
-            1 weeks
+            1 weeks,
+            "ipfs://QmX8"
         );
 
         vm.prank(developer1);
-        platform.submitGame(1, "Game 1", "A great game!");
+        platform.submitGame(
+            1,
+            "Game 1",
+            "A great game!",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
 
         // Voting process
         vm.deal(user1, 1 ether);
@@ -144,7 +167,12 @@ contract GamingGrantPlatformTest is Test {
 
         // Expect revert since the Ether value sent does not match totalAmount
         vm.expectRevert("Ether sent must equal totalAmount");
-        platform.createGrant("GameDev Fund", totalAmount, duration);
+        platform.createGrant(
+            "GameDev Fund",
+            totalAmount,
+            duration,
+            "ipfs://QmX8"
+        );
 
         vm.stopPrank();
     }
@@ -170,7 +198,14 @@ contract GamingGrantPlatformTest is Test {
 
     function testGetGame() public {
         testCreateGrant(); // Ensure a grant is created first
-        platform.submitGame(1, "Game One", "An awesome adventure game");
+        platform.submitGame(
+            1,
+            "Game One",
+            "An awesome adventure game",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
 
         GamingGrantPlatform.Game memory game = platform.getGame(1);
 
@@ -186,7 +221,14 @@ contract GamingGrantPlatformTest is Test {
         uint256 totalVotes = platform.getTotalVotes(1);
         assertEq(totalVotes, 0); // Initially, there should be no votes
 
-        platform.submitGame(1, "Game One", "An awesome adventure game");
+        platform.submitGame(
+            1,
+            "Game One",
+            "An awesome adventure game",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
 
         // Simulate voting (need to add voting logic here)
         vm.deal(address(0x2), 1 ether); // Fund another address for voting
@@ -200,7 +242,14 @@ contract GamingGrantPlatformTest is Test {
 
     function testGetVoteCount() public {
         testCreateGrant(); // Ensure a grant is created first
-        platform.submitGame(1, "Game One", "An awesome adventure game");
+        platform.submitGame(
+            1,
+            "Game One",
+            "An awesome adventure game",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
 
         uint256 voteCount = platform.getVoteCount(1);
         assertEq(voteCount, 0); // Initially, there should be no votes
@@ -217,9 +266,23 @@ contract GamingGrantPlatformTest is Test {
     function testGetAllGamesOfGrant() public {
         testCreateGrant(); // Ensure a grant is created first
         vm.prank(developer1);
-        platform.submitGame(1, "Game One", "An awesome adventure game");
+        platform.submitGame(
+            1,
+            "Game One",
+            "An awesome adventure game",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
         vm.prank(developer2);
-        platform.submitGame(1, "Game Two", "A thrilling RPG");
+        platform.submitGame(
+            1,
+            "Game Two",
+            "A thrilling RPG",
+            "ipfs://QmX8",
+            "ipfs://QmX8",
+            "ipfs://QmX8"
+        );
 
         uint256[] memory games = platform.getAllGamesOfGrant(1);
 
