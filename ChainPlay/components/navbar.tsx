@@ -54,16 +54,9 @@ export default function Navbar() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <Link href="/marketplace" legacyBehavior passHref>
+                <Link href="/grants" legacyBehavior passHref>
                   <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                    Marketplace
-                  </NavigationMenuLink>
-                </Link>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <Link href="/leaderboard" legacyBehavior passHref>
-                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                    Leaderboard
+                    Grants
                   </NavigationMenuLink>
                 </Link>
               </NavigationMenuItem>
@@ -127,12 +120,6 @@ function MobileNav() {
           className="text-sm font-medium hover:text-primary transition-colors"
         >
           Marketplace
-        </Link>
-        <Link
-          href="/leaderboard"
-          className="text-sm font-medium hover:text-primary transition-colors"
-        >
-          Leaderboard
         </Link>
       </nav>
     </div>

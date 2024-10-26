@@ -21,38 +21,48 @@ contract GamingGrantPlatform {
     error NotGrantCreator();
 
     /* Type declarations */
+    enum Genre {
+        Action,
+        Adventure,
+        RPG,
+        Strategy,
+        Sports,
+        Puzzle
+    }
+
     struct Grant {
         string name;
-        uint256 totalAmount; // Total grant amount from the company
-        uint256 startTime; // Timestamp when the grant starts
-        uint256 duration; // Duration of the grant in seconds
-        bool finalized; // True if grant funding has been distributed
-        uint256[] games; // List of game IDs under this grant
-        uint256 totalVotes; // Total votes across all games (used for quadratic funding)
-        address creator; // Tracks the creator's address
-        string grantURI; // IPFS URI for the grant banner
+        uint256 totalAmount;
+        uint256 startTime;
+        uint256 duration;
+        bool finalized;
+        uint256[] games;
+        uint256 totalVotes;
+        address creator;
+        string grantURI;
     }
 
     struct Game {
         string name;
         string details;
         address developer;
-        uint256 voteCount; // Number of votes received
-        uint256 funding; // Amount funded by users
-        string gameURI; // IPFS URI for the game download link
-        string imageURI; // IPFS URI for the game's image
-        string videoURI; // IPFS URI for the gameplay video
+        uint256 voteCount;
+        uint256 funding;
+        string gameURI;
+        string imageURI;
+        string videoURI;
+        Genre genre; // New genre field added here
     }
 
     /* State variables */
     Counters.Counter private grantIdCounter;
     Counters.Counter private gameIdCounter;
 
-    mapping(uint256 => Grant) private grants; // grantId => Grant
-    mapping(uint256 => Game) private games; // gameId => Game
-    mapping(address => mapping(uint256 => bool)) private submittedGames; // Tracks if developer submitted a game for a grant
-    mapping(uint256 => mapping(address => uint256)) private votes; // Tracks votes by users for games in a grant
-    mapping(uint256 => mapping(address => bool)) private hasVoted; // Tracks if a user voted for a game under a specific grant
+    mapping(uint256 => Grant) private grants;
+    mapping(uint256 => Game) private games;
+    mapping(address => mapping(uint256 => bool)) private submittedGames;
+    mapping(uint256 => mapping(address => uint256)) private votes;
+    mapping(uint256 => mapping(address => bool)) private hasVoted;
 
     /* Events */
     event GrantCreated(
@@ -69,7 +79,8 @@ contract GamingGrantPlatform {
         address indexed developer,
         string gameURI,
         string imageURI,
-        string videoURI
+        string videoURI,
+        Genre genre // Emit genre in the GameSubmitted event
     );
     event Voted(uint256 indexed gameId, address indexed voter, uint256 amount);
     event GrantFinalized(
@@ -100,13 +111,6 @@ contract GamingGrantPlatform {
 
     /* Functions */
 
-    /**
-     * @notice Creates a new grant for game developers.
-     * @param name Name of the grant.
-     * @param totalAmount Total funding amount provided by the gaming company.
-     * @param duration Duration of the grant in seconds.
-     * @param grantURI IPFS URI for the grant banner.
-     */
     function createGrant(
         string memory name,
         uint256 totalAmount,
@@ -140,22 +144,14 @@ contract GamingGrantPlatform {
         );
     }
 
-    /**
-     * @notice Allows game developers to submit their game under a specific grant.
-     * @param grantId ID of the grant.
-     * @param gameName Name of the game.
-     * @param gameDetails Details of the game (e.g., description, features).
-     * @param gameURI IPFS URI for the game download link.
-     * @param imageURI IPFS URI for the game's image.
-     * @param videoURI IPFS URI for the gameplay video.
-     */
     function submitGame(
         uint256 grantId,
         string memory gameName,
         string memory gameDetails,
         string memory gameURI,
         string memory imageURI,
-        string memory videoURI
+        string memory videoURI,
+        Genre genre // Genre parameter added here
     ) external grantExists(grantId) grantActive(grantId) {
         if (submittedGames[msg.sender][grantId]) {
             revert GameAlreadySubmitted();
@@ -172,7 +168,8 @@ contract GamingGrantPlatform {
             funding: 0,
             gameURI: gameURI,
             imageURI: imageURI,
-            videoURI: videoURI
+            videoURI: videoURI,
+            genre: genre // Assign genre to the game
         });
 
         grants[grantId].games.push(gameId);
@@ -184,7 +181,8 @@ contract GamingGrantPlatform {
             msg.sender,
             gameURI,
             imageURI,
-            videoURI
+            videoURI,
+            genre
         );
     }
 
@@ -275,5 +273,46 @@ contract GamingGrantPlatform {
             allGrants[i - 1] = grants[i];
         }
         return allGrants;
+    }
+
+    function getAllGames() external view returns (Game[] memory) {
+        Game[] memory allGames = new Game[](gameIdCounter.current());
+        for (uint256 i = 1; i <= gameIdCounter.current(); i++) {
+            allGames[i - 1] = games[i];
+        }
+        return allGames;
+    }
+
+    /**
+     * @notice Fetches all games on the platform by genre.
+     * @param genre Genre to filter games by.
+     * @return gamesByGenre Array of games that match the specified genre.
+     */
+    function getAllGamesByGenre(
+        Genre genre
+    ) external view returns (Game[] memory) {
+        uint256 gameCount = gameIdCounter.current();
+        uint256 matchingGameCount;
+
+        // First loop to count matching games
+        for (uint256 i = 1; i <= gameCount; i++) {
+            if (games[i].genre == genre) {
+                matchingGameCount++;
+            }
+        }
+
+        // Create a temporary array to hold the matching games
+        Game[] memory gamesByGenre = new Game[](matchingGameCount);
+        uint256 index;
+
+        // Second loop to populate the array with matching games
+        for (uint256 i = 1; i <= gameCount; i++) {
+            if (games[i].genre == genre) {
+                gamesByGenre[index] = games[i];
+                index++;
+            }
+        }
+
+        return gamesByGenre;
     }
 }

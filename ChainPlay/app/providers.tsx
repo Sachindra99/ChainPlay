@@ -24,7 +24,7 @@ export function Providers({ children, initialState }: Props) {
         <RainbowKitProvider
           modalSize="compact"
           theme={darkTheme({
-            accentColor: "#7b3fe4",
+            accentColor: "#50C878",
             accentColorForeground: "white",
             borderRadius: "small",
             fontStack: "system",
