@@ -4,7 +4,6 @@ import {
     cookieStorage,
     createStorage
   } from 'wagmi'
-  import { mainnet, sepolia, avalancheFuji, } from 'wagmi/chains'
   import {type Chain} from 'viem'
 
   export const aiaTestnet = {
@@ -21,15 +20,12 @@ import {
   
   export function getConfig() {
     return createConfig({
-      chains: [mainnet, sepolia, avalancheFuji,aiaTestnet],
+      chains: [aiaTestnet],
       ssr: true,
       storage: createStorage({
         storage: cookieStorage,
       }),
       transports: {
-        [mainnet.id]: http(),
-        [sepolia.id]: http(),
-        [avalancheFuji.id]: http(),
         [aiaTestnet.id]: http(),
       },
     })
