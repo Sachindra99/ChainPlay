@@ -1,103 +1,57 @@
+"use client";
+
 import React from "react";
+import { motion } from "framer-motion";
 
-export default function GrantsBackground({
-  children,
-}: {
+interface FuturisticBackgroundProps {
   children: React.ReactNode;
-}) {
+}
+
+export default function FuturisticBackground({
+  children,
+}: FuturisticBackgroundProps) {
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
-      <svg
-        className="absolute inset-0 w-full h-full"
-        xmlns="http://www.w3.org/2000/svg"
+    <div className="relative w-full min-h-[92vh] overflow-hidden bg-gradient-to-br from-green-900 to-cyan-900">
+      <motion.div
+        className="absolute inset-0"
+        animate={{
+          rotate: 360,
+        }}
+        transition={{
+          duration: 200,
+          repeat: Infinity,
+          ease: "linear",
+        }}
       >
-        <defs>
-          <radialGradient
-            id="grad1"
-            cx="50%"
-            cy="50%"
-            r="50%"
-            fx="50%"
-            fy="50%"
-          >
-            <stop
-              offset="0%"
-              style={{ stopColor: "rgb(0, 255, 255)", stopOpacity: 0.3 }}
-            />
-            <stop
-              offset="100%"
-              style={{ stopColor: "rgb(0, 128, 128)", stopOpacity: 0 }}
-            />
-          </radialGradient>
-          <radialGradient
-            id="grad2"
-            cx="50%"
-            cy="50%"
-            r="50%"
-            fx="50%"
-            fy="50%"
-          >
-            <stop
-              offset="0%"
-              style={{ stopColor: "rgb(0, 255, 0)", stopOpacity: 0.3 }}
-            />
-            <stop
-              offset="100%"
-              style={{ stopColor: "rgb(0, 128, 0)", stopOpacity: 0 }}
-            />
-          </radialGradient>
-        </defs>
-
-        {[...Array(20)].map((_, i) => (
-          <circle
-            key={`c1-${i}`}
-            className="animate-float"
-            cx={Math.random() * 100 + "%"}
-            cy={Math.random() * 100 + "%"}
-            r={Math.random() * 50 + 10}
-            fill="url(#grad1)"
-            style={{ animationDelay: `${Math.random() * 5}s` }}
+        {/* Animated circles */}
+        {[...Array(10)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full mix-blend-screen filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 2, 2, 1, 1],
+              opacity: [0.1, 0.2, 0.4, 0.2, 0.1],
+              x: [0, 100, 200, 100, 0],
+              y: [0, -100, 0, 100, 0],
+              transition: {
+                duration: Math.random() * 5 + 5,
+                repeat: Infinity,
+                repeatType: "reverse",
+              },
+            }}
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              width: `${Math.random() * 100 + 50}px`,
+              height: `${Math.random() * 100 + 50}px`,
+              backgroundColor: Math.random() > 0.5 ? "#00ff00" : "#00ffff",
+            }}
           />
         ))}
+      </motion.div>
 
-        {[...Array(20)].map((_, i) => (
-          <circle
-            key={`c2-${i}`}
-            className="animate-float"
-            cx={Math.random() * 100 + "%"}
-            cy={Math.random() * 100 + "%"}
-            r={Math.random() * 50 + 10}
-            fill="url(#grad2)"
-            style={{ animationDelay: `${Math.random() * 5}s` }}
-          />
-        ))}
-      </svg>
-
-      <div className="relative z-10 flex space-x-4 space-y-2 h-full">
-        {children}
-      </div>
-
-      <style jsx>{`
-        @keyframes float {
-          0% {
-            transform: translate(0, 0);
-            opacity: 0;
-          }
-          50% {
-            opacity: 0.8;
-          }
-          100% {
-            transform: translate(
-              ${Math.random() > 0.5 ? "" : "-"}${Math.random() * 200}px,
-              ${Math.random() > 0.5 ? "" : "-"}${Math.random() * 200}px
-            );
-            opacity: 0;
-          }
-        }
-        .animate-float {
-          animation: float 15s infinite;
-        }
-      `}</style>
+      {/* Content */}
+      <div className="relative z-10 w-full h-full">{children}</div>
     </div>
   );
 }
