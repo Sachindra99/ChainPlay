@@ -49,7 +49,7 @@ export default function CardDemo({
           "cursor-pointer overflow-hidden relative card h-96 rounded-md shadow-xl max-w-sm mx-auto flex flex-col justify-between p-4"
         )}
         style={{
-          backgroundImage: `url(${backgroundImage})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0),rgba(0,0,0,0) 70%, rgba(0, 0, 0, 0.8) 100%), url(${backgroundImage})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -64,7 +64,7 @@ export default function CardDemo({
             alt="blockie"
           />
           <div className="flex flex-col">
-            <p className="font-normal text-base text-gray-50 relative z-10 backdrop-blur-lg">
+            <p className="font-normal text-base text-gray-200 relative z-10">
               {formatAddress(grantCreator)}
             </p>
             <p
@@ -77,7 +77,7 @@ export default function CardDemo({
           </div>
         </div>
         <div className="text flex flex-col">
-          <h1 className="font-bold text-xl md:text-2xl text-gray-50 relative z-10">
+          <h1 className="font-bold text-xl md:text-2xl text-gray-50 relative z-10 text-">
             {grantName}
           </h1>
           <p className="font-normal text-sm text-gray-50 relative z-10 mb-2">

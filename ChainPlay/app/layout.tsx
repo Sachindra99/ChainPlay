@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { headers } from "next/headers";
 import { cookieToInitialState } from "wagmi";
+import { Toaster } from "@/components/ui/toaster";
 
 import { getConfig } from "./config";
 import { Providers } from "./providers";
@@ -41,6 +42,7 @@ export default function RootLayout({
         <Providers initialState={initialState}>
           <Navbar />
           {children}
+          <Toaster />
         </Providers>
       </body>
     </html>
