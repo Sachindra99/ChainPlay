@@ -2,7 +2,6 @@
 
 import FuturisticBackground from "@/components/ui/GrantsBackground";
 import abi from "@/app/abi";
-
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
@@ -34,14 +33,19 @@ import { Input } from "@/components/ui/input";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Card, CardContent } from "@/components/ui/card";
+import { intervalToDuration, isAfter } from "date-fns";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 const gameSchema = z.object({
   gameName: z.string().min(1, "Game Name is required"),
   gameDetails: z.string().min(1, "Please enter a valid Description"),
   genre: z.enum(["0", "1", "2", "3", "4", "5"]),
-  gameURI: z.string(),
-  imageURI: z.string(),
-  videoURI: z.string(),
+  gameURI: z.string().optional(),
+  imageURI: z.string().optional(),
+  videoURI: z.string().optional(),
 });
 
 type GameFormInputs = z.infer<typeof gameSchema>;
@@ -72,6 +76,53 @@ interface Game {
 
 const contractAddress = "0x44378e1beefC422568ABa878c74168369e4840C6";
 
+interface CountdownProps {
+  startTime: bigint;
+  duration: bigint;
+}
+
+function Countdown({ startTime, duration }: CountdownProps) {
+  const [timeLeft, setTimeLeft] = useState(
+    intervalToDuration({ start: 0, end: 0 })
+  );
+
+  const endDate = new Date(Number(startTime + duration) * 1000);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      if (isAfter(now, endDate)) {
+        clearInterval(interval);
+      } else {
+        setTimeLeft(intervalToDuration({ start: now, end: endDate }));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [endDate]);
+
+  return (
+    <Card className="flex justify-around text-center p-4 bg-black/40 backdrop-blur-lg text-white rounded-lg">
+      <CardContent>
+        <h2 className="text-lg font-semibold">Days</h2>
+        <p className="text-3xl font-bold">{timeLeft.days ?? 0}</p>
+      </CardContent>
+      <CardContent>
+        <h2 className="text-lg font-semibold">Hours</h2>
+        <p className="text-3xl font-bold">{timeLeft.hours ?? 0}</p>
+      </CardContent>
+      <CardContent>
+        <h2 className="text-lg font-semibold">Minutes</h2>
+        <p className="text-3xl font-bold">{timeLeft.minutes ?? 0}</p>
+      </CardContent>
+      <CardContent>
+        <h2 className="text-lg font-semibold">Seconds</h2>
+        <p className="text-3xl font-bold">{timeLeft.seconds ?? 0}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Page({ params }: { params: { id: number } }) {
   const { control, handleSubmit } = useForm<GameFormInputs>({
     resolver: zodResolver(gameSchema),
@@ -84,6 +135,7 @@ export default function Page({ params }: { params: { id: number } }) {
       videoURI: "",
     },
   });
+
   const [video, setVideo] = useState<File | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [gameZip, setGameZip] = useState<File | null>(null);
@@ -92,12 +144,14 @@ export default function Page({ params }: { params: { id: number } }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const grantId = Number(params.id);
+
   const { data } = useReadContract({
     abi: abi,
     address: contractAddress,
     functionName: "getGrant",
     args: [grantId + 1],
   });
+
   useEffect(() => {
     if (data) {
       setIsLoading(false);
@@ -130,11 +184,11 @@ export default function Page({ params }: { params: { id: number } }) {
   });
 
   const games = game as Game[] | undefined;
-
   const grant = data as Grant | undefined;
   const grantAmountinAia = Number(grant?.totalAmount) / 10 ** 18;
 
   const { writeContractAsync } = useWriteContract();
+
   async function submitGame(
     name: string,
     details: string,
@@ -209,40 +263,33 @@ export default function Page({ params }: { params: { id: number } }) {
       setSubmitLoading(false);
       return;
     }
-    const imgData = new FormData();
-    imgData.set("file", image);
-    const videoData = new FormData();
-    videoData.set("file", video);
-    const gameData = new FormData();
-    gameData.set("file", gameZip);
-    const uploadRequestVideo = await fetch("/api/files", {
-      method: "POST",
-      body: videoData,
-    });
-    const videoURI = await uploadRequestVideo.json();
 
-    const uploadRequestImage = await fetch("/api/files", {
-      method: "POST",
-      body: imgData,
-    });
-    const imageURI = await uploadRequestImage.json();
-
-    const uploadRequestGame = await fetch("/api/files", {
-      method: "POST",
-      body: gameData,
-    });
-    const gameURI = await uploadRequestGame.json();
-
-    if (videoURI.error || imageURI.error || gameURI.error) {
-      toast({
-        title: "Error",
-        description: "Error uploading files",
-        variant: "destructive",
-      });
-      setSubmitLoading(false);
-      return;
-    }
     try {
+      // Upload files
+      const imgData = new FormData();
+      imgData.set("file", image);
+      const videoData = new FormData();
+      videoData.set("file", video);
+      const gameData = new FormData();
+      gameData.set("file", gameZip);
+
+      const [videoRes, imageRes, gameRes] = await Promise.all([
+        fetch("/api/files", { method: "POST", body: videoData }),
+        fetch("/api/files", { method: "POST", body: imgData }),
+        fetch("/api/files", { method: "POST", body: gameData }),
+      ]);
+
+      const [videoURI, imageURI, gameURI] = await Promise.all([
+        videoRes.json(),
+        imageRes.json(),
+        gameRes.json(),
+      ]);
+
+      if (videoURI.error || imageURI.error || gameURI.error) {
+        throw new Error("Error uploading files");
+      }
+
+      // Submit game to contract
       await submitGame(
         data.gameName,
         data.gameDetails,
@@ -251,12 +298,14 @@ export default function Page({ params }: { params: { id: number } }) {
         imageURI,
         gameURI
       );
+
       setSubmitLoading(false);
       handleDialogClose();
     } catch (error: unknown) {
       toast({
-        title: "ErrorInFinalize",
-        description: "Error submitting game",
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Error submitting game",
         variant: "destructive",
       });
       console.error("Error submitting game", error);
@@ -276,7 +325,7 @@ export default function Page({ params }: { params: { id: number } }) {
             <div className="flex justify-between items-center mb-8">
               <div className="hover:bg-slate-500/60 rounded-full w-12 h-12 flex justify-center items-center">
                 <ArrowLeft
-                  className="cursor-pointer "
+                  className="cursor-pointer"
                   onClick={() => router.push("/grants")}
                 />
               </div>
@@ -293,24 +342,34 @@ export default function Page({ params }: { params: { id: number } }) {
                   <DialogHeader>
                     <DialogTitle>Add a New Game</DialogTitle>
                   </DialogHeader>
-                  <form
-                    onSubmit={async () => {
-                      handleSubmit(onSubmit);
-                    }}
-                  >
+                  <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="space-y-4">
                       <Label htmlFor="gamename">Game Name</Label>
-                      <Input
-                        {...control.register("gameName")}
-                        id="gamename"
-                        placeholder="Game Name"
+                      <Controller
+                        name="gameName"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            id="gamename"
+                            placeholder="Game Name"
+                            {...field}
+                          />
+                        )}
                       />
+
                       <Label htmlFor="gamedesc">Description</Label>
-                      <Input
-                        {...control.register("gameDetails")}
-                        id="gamedesc"
-                        placeholder="Description"
+                      <Controller
+                        name="gameDetails"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            id="gamedesc"
+                            placeholder="Description"
+                            {...field}
+                          />
+                        )}
                       />
+
                       <Controller
                         control={control}
                         name="genre"
@@ -333,6 +392,7 @@ export default function Page({ params }: { params: { id: number } }) {
                           </Select>
                         )}
                       />
+
                       <Label htmlFor="video">
                         Upload Video (less than 25MB)
                       </Label>
@@ -344,6 +404,7 @@ export default function Page({ params }: { params: { id: number } }) {
                           setVideo(file);
                         }}
                       />
+
                       <Label htmlFor="image">Upload Image</Label>
                       <Input
                         id="image"
@@ -353,6 +414,7 @@ export default function Page({ params }: { params: { id: number } }) {
                           setImage(file);
                         }}
                       />
+
                       <Label htmlFor="game">
                         Upload Game (.zip less than 25MB)
                       </Label>
@@ -467,57 +529,5 @@ export default function Page({ params }: { params: { id: number } }) {
         )}
       </div>
     </FuturisticBackground>
-  );
-}
-import { Card, CardContent } from "@/components/ui/card";
-import { intervalToDuration, isAfter } from "date-fns";
-import { Label } from "@/components/ui/label";
-import { toast } from "@/components/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-
-interface CountdownProps {
-  startTime: bigint;
-  duration: bigint;
-}
-
-function Countdown({ startTime, duration }: CountdownProps) {
-  const [timeLeft, setTimeLeft] = useState(
-    intervalToDuration({ start: 0, end: 0 })
-  );
-
-  const endDate = new Date(Number(startTime + duration) * 1000);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      if (isAfter(now, endDate)) {
-        clearInterval(interval);
-      } else {
-        setTimeLeft(intervalToDuration({ start: now, end: endDate }));
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [endDate]);
-
-  return (
-    <Card className="flex justify-around text-center p-4 bg-black/40 backdrop-blur-lg text-white rounded-lg">
-      <CardContent>
-        <h2 className="text-lg font-semibold">Days</h2>
-        <p className="text-3xl font-bold">{timeLeft.days ?? 0}</p>
-      </CardContent>
-      <CardContent>
-        <h2 className="text-lg font-semibold">Hours</h2>
-        <p className="text-3xl font-bold">{timeLeft.hours ?? 0}</p>
-      </CardContent>
-      <CardContent>
-        <h2 className="text-lg font-semibold">Minutes</h2>
-        <p className="text-3xl font-bold">{timeLeft.minutes ?? 0}</p>
-      </CardContent>
-      <CardContent>
-        <h2 className="text-lg font-semibold">Seconds</h2>
-        <p className="text-3xl font-bold">{timeLeft.seconds ?? 0}</p>
-      </CardContent>
-    </Card>
   );
 }
