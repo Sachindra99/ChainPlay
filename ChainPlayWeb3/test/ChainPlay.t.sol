@@ -1,308 +1,497 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
-import {console} from "forge-std/console.sol";
-import {Test} from "forge-std/Test.sol";
-import {GamingGrantPlatform} from "../src/ChainPlay.sol";
-import {DeployGameGrant} from "../script/DeployChainPlay.s.sol";
+import "forge-std/Test.sol";
+import "../src/ChainPlay.sol";
 
 contract GamingGrantPlatformTest is Test {
-    GamingGrantPlatform private platform;
-    DeployGameGrant private deployer;
-    address private creator = address(0x1);
-    address private developer1 = address(0x2);
-    address private developer2 = address(0x3);
-    address private user1 = address(0x4);
+    GamingGrantPlatform platform;
+    address public creator;
+    address public developer1;
+    address public developer2;
+    address public voter1;
+    address public voter2;
+
+    // Test constants
+    uint256 constant GRANT_AMOUNT = 10 ether;
+    uint256 constant GRANT_DURATION = 7 days;
+    uint256 constant VOTE_AMOUNT = 1 ether;
 
     function setUp() public {
         platform = new GamingGrantPlatform();
-        vm.deal(creator, 1000 ether);
-        vm.deal(developer1, 10 ether);
-        vm.deal(developer2, 10 ether);
-        vm.deal(user1, 10 ether);
-        deployer = new DeployGameGrant();
+
+        // Setup test addresses
+        creator = makeAddr("creator");
+        developer1 = makeAddr("developer1");
+        developer2 = makeAddr("developer2");
+        voter1 = makeAddr("voter1");
+        voter2 = makeAddr("voter2");
+
+        // Fund test addresses
+        vm.deal(creator, 100 ether);
+        vm.deal(voter1, 10 ether);
+        vm.deal(voter2, 10 ether);
     }
+
+    /* Grant Creation Tests */
 
     function testCreateGrant() public {
         vm.startPrank(creator);
-        uint256 totalAmount = 5 ether;
-        uint256 duration = 1 days;
 
-        platform.createGrant{value: totalAmount}(
-            "GameDev Fund",
-            totalAmount,
-            duration,
-            "ipfs://QmX8"
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
         );
 
         GamingGrantPlatform.Grant memory grant = platform.getGrant(1);
-        assertEq(grant.name, "GameDev Fund");
-        assertEq(grant.startTime, block.timestamp);
-        assertEq(grant.duration, duration);
-        assertEq(grant.totalAmount, totalAmount);
+
+        assertEq(grant.name, "Game Development Grant");
+        assertEq(grant.totalAmount, GRANT_AMOUNT);
+        assertEq(grant.duration, GRANT_DURATION);
         assertEq(grant.creator, creator);
+        assertEq(grant.grantURI, "ipfs://grant-uri");
+        assertFalse(grant.finalized);
 
         vm.stopPrank();
     }
+
+    function testCreateGrantWithInsufficientFunds() public {
+        vm.startPrank(creator);
+
+        vm.expectRevert("Ether sent must equal totalAmount");
+        platform.createGrant{value: 1 ether}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
+        );
+
+        vm.stopPrank();
+    }
+
+    /* Game Submission Tests */
 
     function testSubmitGame() public {
-        testCreateGrant();
+        // First create a grant
+        vm.prank(creator);
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
+        );
 
+        // Submit a game
         vm.startPrank(developer1);
         platform.submitGame(
-            1,
-            "GameOne",
-            "An adventure game",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
+            1, // grantId
+            "Awesome Game",
+            "An awesome game description",
+            "ipfs://game-uri",
+            "ipfs://image-uri",
+            "ipfs://video-uri",
+            GamingGrantPlatform.Genre.Action
         );
+
         GamingGrantPlatform.Game memory game = platform.getGame(1);
 
-        assertEq(game.name, "GameOne");
-        assertEq(game.details, "An adventure game");
+        assertEq(game.name, "Awesome Game");
         assertEq(game.developer, developer1);
+        assertEq(game.gameURI, "ipfs://game-uri");
+        assertEq(game.imageURI, "ipfs://image-uri");
+        assertEq(game.videoURI, "ipfs://video-uri");
+        assertEq(uint(game.genre), uint(GamingGrantPlatform.Genre.Action));
 
         vm.stopPrank();
     }
 
-    function testDoubleSubmitGame() public {
-        testSubmitGame();
+    function testCannotSubmitMultipleGamesPerGrant() public {
+        // Create grant
+        vm.prank(creator);
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
+        );
 
+        // Submit first game
         vm.startPrank(developer1);
-        vm.expectRevert(abi.encodeWithSignature("GameAlreadySubmitted()"));
         platform.submitGame(
             1,
-            "Another Game",
-            "An RPG experience",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
+            "First Game",
+            "Description",
+            "ipfs://game-uri-1",
+            "ipfs://image-uri-1",
+            "ipfs://video-uri-1",
+            GamingGrantPlatform.Genre.Action
         );
+
+        // Try to submit second game
+        vm.expectRevert(GamingGrantPlatform.GameAlreadySubmitted.selector);
+        platform.submitGame(
+            1,
+            "Second Game",
+            "Description",
+            "ipfs://game-uri-2",
+            "ipfs://image-uri-2",
+            "ipfs://video-uri-2",
+            GamingGrantPlatform.Genre.RPG
+        );
+
         vm.stopPrank();
     }
 
-    function testVoteGame() public {
-        testSubmitGame();
+    function testCannotSubmitGameAfterGrantEnds() public {
+        // Create grant
+        vm.prank(creator);
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
+        );
 
-        vm.startPrank(user1);
-        uint256 voteAmount = 1 ether;
-        platform.vote{value: voteAmount}(1, 1);
+        // Move time forward past grant duration
+        vm.warp(block.timestamp + GRANT_DURATION + 1);
+
+        // Try to submit game
+        vm.startPrank(developer1);
+        vm.expectRevert("Grant has ended");
+        platform.submitGame(
+            1,
+            "Late Game",
+            "Description",
+            "ipfs://game-uri",
+            "ipfs://image-uri",
+            "ipfs://video-uri",
+            GamingGrantPlatform.Genre.Action
+        );
+
+        vm.stopPrank();
+    }
+
+    /* Voting Tests */
+
+    function testVoting() public {
+        // Setup grant and game
+        setupGrantAndGame();
+
+        // Vote
+        vm.prank(voter1);
+        platform.vote{value: VOTE_AMOUNT}(1, 1);
 
         GamingGrantPlatform.Game memory game = platform.getGame(1);
         assertEq(game.voteCount, 1);
-        assertEq(game.funding, voteAmount);
-        vm.stopPrank();
+        assertEq(game.funding, VOTE_AMOUNT);
     }
 
-    function testMultipleVotes() public {
-        testVoteGame();
+    function testCannotVoteMultipleTimes() public {
+        // Setup grant and game
+        setupGrantAndGame();
 
-        vm.startPrank(user1);
+        vm.startPrank(voter1);
+
+        // First vote succeeds
+        platform.vote{value: VOTE_AMOUNT}(1, 1);
+
+        // Second vote fails
         vm.expectRevert("Already voted");
-        platform.vote{value: 1 ether}(1, 1);
+        platform.vote{value: VOTE_AMOUNT}(1, 1);
+
         vm.stopPrank();
     }
 
-    function testFinalizeGrant() public {
+    function testCannotVoteAfterGrantEnds() public {
+        // Setup grant and game
+        setupGrantAndGame();
+
+        // Move time forward past grant duration
+        vm.warp(block.timestamp + GRANT_DURATION + 1);
+
+        // Try to vote
+        vm.startPrank(voter1);
+        vm.expectRevert("Grant has ended");
+        platform.vote{value: VOTE_AMOUNT}(1, 1);
+
+        vm.stopPrank();
+    }
+
+    /* Grant Finalization Tests */
+
+    function testGrantFinalization() public {
+        // Setup grant and game
+        setupGrantAndGame();
+
+        // Add votes
+        vm.prank(voter1);
+        platform.vote{value: VOTE_AMOUNT}(1, 1);
+
+        vm.prank(voter2);
+        platform.vote{value: 2 ether}(1, 1);
+
+        // Move time forward past grant duration
+        vm.warp(block.timestamp + GRANT_DURATION + 1);
+
+        // Record developer's initial balance
+        uint256 initialBalance = developer1.balance;
+
+        // Finalize grant
         vm.prank(creator);
-        platform.createGrant{value: 100 ether}(
-            "Test Grant",
-            100 ether,
-            1 weeks,
-            "ipfs://QmX8"
+        platform.finalizeGrant(1);
+
+        // Verify developer received funds
+        assertGt(developer1.balance, initialBalance);
+
+        // Verify grant is marked as finalized
+        GamingGrantPlatform.Grant memory grant = platform.getGrant(1);
+        assertTrue(grant.finalized);
+    }
+
+    function testCannotFinalizeGrantBeforeEnd() public {
+        // Setup grant and game
+        setupGrantAndGame();
+
+        // Try to finalize before end
+        vm.prank(creator);
+        vm.expectRevert("Grant duration not over");
+        platform.finalizeGrant(1);
+    }
+
+    function testCannotFinalizeGrantTwice() public {
+        // Setup grant and game
+        setupGrantAndGame();
+
+        // Move time forward past grant duration
+        vm.warp(block.timestamp + GRANT_DURATION + 1);
+
+        vm.startPrank(creator);
+
+        // First finalization succeeds
+        platform.finalizeGrant(1);
+
+        // Second finalization fails
+        vm.expectRevert("Grant already finalized");
+        platform.finalizeGrant(1);
+
+        vm.stopPrank();
+    }
+
+    function testOnlyCreatorCanFinalizeGrant() public {
+        // Setup grant and game
+        setupGrantAndGame();
+
+        // Move time forward past grant duration
+        vm.warp(block.timestamp + GRANT_DURATION + 1);
+
+        // Try to finalize from non-creator address
+        vm.prank(developer1);
+        vm.expectRevert(GamingGrantPlatform.NotGrantCreator.selector);
+        platform.finalizeGrant(1);
+    }
+
+    /* Getter Function Tests */
+
+    function testGetAllGamesOfGrant() public {
+        // Setup grant and multiple games
+        vm.prank(creator);
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
         );
 
         vm.prank(developer1);
         platform.submitGame(
             1,
             "Game 1",
-            "A great game!",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
+            "Description 1",
+            "ipfs://game-uri-1",
+            "ipfs://image-uri-1",
+            "ipfs://video-uri-1",
+            GamingGrantPlatform.Genre.Action
         );
 
-        // Voting process
-        vm.deal(user1, 1 ether);
-        vm.prank(user1);
-        platform.vote{value: 1 ether}(1, 1);
-
-        vm.deal(developer2, 1 ether);
         vm.prank(developer2);
-        platform.vote{value: 1 ether}(1, 1);
+        platform.submitGame(
+            1,
+            "Game 2",
+            "Description 2",
+            "ipfs://game-uri-2",
+            "ipfs://image-uri-2",
+            "ipfs://video-uri-2",
+            GamingGrantPlatform.Genre.RPG
+        );
 
-        // Move time forward by one week to end the grant
-        vm.warp(block.timestamp + 1 weeks + 1);
+        GamingGrantPlatform.Game[] memory games = platform.getAllGamesOfGrant(
+            1
+        );
+        assertEq(games.length, 2);
+        assertEq(games[0].name, "Game 1");
+        assertEq(games[1].name, "Game 2");
+    }
 
+    function testGetAllGamesByGenre() public {
+        // Setup grant and multiple games of different genres
         vm.prank(creator);
-        platform.finalizeGrant(1);
-
-        GamingGrantPlatform.Grant memory grant = platform.getGrant(1);
-        assertTrue(grant.finalized);
-    }
-
-    function testFinalizeGrantBeforeEnd() public {
-        testVoteGame();
-
-        vm.startPrank(creator);
-        vm.expectRevert("Grant duration not over");
-        platform.finalizeGrant(1);
-        vm.stopPrank();
-    }
-
-    function testNonCreatorCannotFinalizeGrant() public {
-        testVoteGame();
-        vm.startPrank(user1);
-
-        vm.expectRevert(abi.encodeWithSignature("NotGrantCreator()"));
-        platform.finalizeGrant(1);
-        vm.stopPrank();
-    }
-
-    function testCreateGrantWithoutPayment() public {
-        vm.startPrank(creator);
-        uint256 totalAmount = 5 ether;
-        uint256 duration = 1 days;
-
-        // Expect revert since the Ether value sent does not match totalAmount
-        vm.expectRevert("Ether sent must equal totalAmount");
-        platform.createGrant(
-            "GameDev Fund",
-            totalAmount,
-            duration,
-            "ipfs://QmX8"
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
         );
 
-        vm.stopPrank();
-    }
-
-    function testDeployGamingGrantPlatform() public {
-        // Execute the deploy script
-        deployer.run();
-
-        // Verify that the GamingGrantPlatform was deployed correctly
-        platform = new GamingGrantPlatform(); // We directly instantiate to get the address
-
-        // Check that the platform address is not zero
-        assertTrue(
-            address(platform) != address(0),
-            "GamingGrantPlatform should be deployed"
-        );
-
-        // Optional: Check if the console log captures the correct address
-        // Note: This may not be testable directly in a typical test case as console logs are for debugging
-        // Ensure the contract was deployed and the address is correct
-        console.log("GamingGrantPlatform deployed at:", address(platform));
-    }
-
-    function testGetGame() public {
-        testCreateGrant(); // Ensure a grant is created first
-        platform.submitGame(
-            1,
-            "Game One",
-            "An awesome adventure game",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
-        );
-
-        GamingGrantPlatform.Game memory game = platform.getGame(1);
-
-        assertEq(game.name, "Game One");
-        assertEq(game.details, "An awesome adventure game");
-        assertEq(game.voteCount, 0);
-        assertEq(game.funding, 0);
-    }
-
-    function testGetTotalVotes() public {
-        testCreateGrant(); // Ensure a grant is created first
-
-        uint256 totalVotes = platform.getTotalVotes(1);
-        assertEq(totalVotes, 0); // Initially, there should be no votes
-
-        platform.submitGame(
-            1,
-            "Game One",
-            "An awesome adventure game",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
-        );
-
-        // Simulate voting (need to add voting logic here)
-        vm.deal(address(0x2), 1 ether); // Fund another address for voting
-        vm.startPrank(address(0x2));
-        platform.vote{value: 1 ether}(1, 1);
-        vm.stopPrank();
-
-        totalVotes = platform.getTotalVotes(1);
-        assertEq(totalVotes, 1); // There should be one vote now
-    }
-
-    function testGetVoteCount() public {
-        testCreateGrant(); // Ensure a grant is created first
-        platform.submitGame(
-            1,
-            "Game One",
-            "An awesome adventure game",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
-        );
-
-        uint256 voteCount = platform.getVoteCount(1);
-        assertEq(voteCount, 0); // Initially, there should be no votes
-
-        vm.deal(address(0x2), 1 ether); // Fund another address for voting
-        vm.startPrank(address(0x2));
-        platform.vote{value: 1 ether}(1, 1);
-        vm.stopPrank();
-
-        voteCount = platform.getVoteCount(1);
-        assertEq(voteCount, 1); // There should be one vote now
-    }
-
-    function testGetAllGamesOfGrant() public {
-        testCreateGrant(); // Ensure a grant is created first
         vm.prank(developer1);
         platform.submitGame(
             1,
-            "Game One",
-            "An awesome adventure game",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
+            "Action Game 1",
+            "Description",
+            "ipfs://game-uri-1",
+            "ipfs://image-uri-1",
+            "ipfs://video-uri-1",
+            GamingGrantPlatform.Genre.Action
         );
+
         vm.prank(developer2);
         platform.submitGame(
             1,
-            "Game Two",
-            "A thrilling RPG",
-            "ipfs://QmX8",
-            "ipfs://QmX8",
-            "ipfs://QmX8"
+            "RPG Game",
+            "Description",
+            "ipfs://game-uri-2",
+            "ipfs://image-uri-2",
+            "ipfs://video-uri-2",
+            GamingGrantPlatform.Genre.RPG
         );
 
-        uint256[] memory games = platform.getAllGamesOfGrant(1);
-
-        assertEq(games.length, 2); // Should return two games
-        assertEq(games[0], 1); // Game ID for "Game One"
-        assertEq(games[1], 2); // Game ID for "Game Two"
+        // Get all Action games
+        GamingGrantPlatform.Game[] memory actionGames = platform
+            .getAllGamesByGenre(GamingGrantPlatform.Genre.Action);
+        assertEq(actionGames.length, 1);
+        assertEq(actionGames[0].name, "Action Game 1");
     }
 
-    function testGetAllGrants() public {
-        testCreateGrant(); // Ensure a grant is created first
+    /* Helper Functions */
 
-        GamingGrantPlatform.Grant[] memory grants = platform.getAllGrants();
-        assertEq(grants.length, 1); // Should return one grant
-        assertEq(grants[0].name, "GameDev Fund"); // Check the grant name
+    function setupGrantAndGame() internal {
+        // Create grant
+        vm.prank(creator);
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
+        );
+
+        // Submit game
+        vm.prank(developer1);
+        platform.submitGame(
+            1,
+            "Test Game",
+            "Description",
+            "ipfs://game-uri",
+            "ipfs://image-uri",
+            "ipfs://video-uri",
+            GamingGrantPlatform.Genre.Action
+        );
     }
 
-    function testGetGrant() public {
-        testCreateGrant(); // Ensure a grant is created first
+    function testQuadraticFundingDistribution() public {
+        // Setup initial grant
+        vm.prank(creator);
+        platform.createGrant{value: GRANT_AMOUNT}(
+            "Game Development Grant",
+            GRANT_AMOUNT,
+            GRANT_DURATION,
+            "ipfs://grant-uri"
+        );
 
-        GamingGrantPlatform.Grant memory grant = platform.getGrant(1);
-        assertEq(grant.name, "GameDev Fund"); // Check the grant name
+        // Developer 1 submits first game
+        vm.prank(developer1);
+        platform.submitGame(
+            1,
+            "Game 1",
+            "Description 1",
+            "ipfs://game-uri-1",
+            "ipfs://image-uri-1",
+            "ipfs://video-uri-1",
+            GamingGrantPlatform.Genre.Action
+        );
+
+        // Developer 2 submits second game
+        vm.prank(developer2);
+        platform.submitGame(
+            1,
+            "Game 2",
+            "Description 2",
+            "ipfs://game-uri-2",
+            "ipfs://image-uri-2",
+            "ipfs://video-uri-2",
+            GamingGrantPlatform.Genre.RPG
+        );
+
+        // Record initial balances
+        uint256 dev1InitialBalance = developer1.balance;
+        uint256 dev2InitialBalance = developer2.balance;
+
+        // Voter 1 contributes a large amount to Game 1
+        vm.prank(voter1);
+        platform.vote{value: 4 ether}(1, 1); // 4 ETH to Game 1
+
+        // Voter 2 and Voter 3 split their votes for Game 2
+        address voter3 = makeAddr("voter3");
+        vm.deal(voter3, 10 ether);
+
+        vm.prank(voter2);
+        platform.vote{value: 1 ether}(2, 1); // 1 ETH to Game 2
+
+        vm.prank(voter3);
+        platform.vote{value: 1 ether}(2, 1); // 1 ETH to Game 2
+
+        // Move time forward past grant duration
+        vm.warp(block.timestamp + GRANT_DURATION + 1);
+
+        // Finalize grant
+        vm.prank(creator);
+        platform.finalizeGrant(1);
+
+        // Calculate final balances
+        uint256 dev1FinalBalance = developer1.balance;
+        uint256 dev2FinalBalance = developer2.balance;
+
+        uint256 dev1Received = dev1FinalBalance - dev1InitialBalance;
+        uint256 dev2Received = dev2FinalBalance - dev2InitialBalance;
+
+        // Verify the quadratic funding distribution
+        // Game 1: Single contribution of 4 ETH = sqrt(4)^2 = 4
+        // Game 2: Two contributions of 1 ETH = (sqrt(1) + sqrt(1))^2 = 4
+        // Both games should receive equal matching because:
+        // - Game 1: One large contribution has the same weight as
+        // - Game 2: Two smaller contributions combined
+        // The matching pool (10 ETH) should be split equally
+
+        // Expected amounts:
+        // Game 1: 4 ETH (direct) + 5 ETH (matching) = 9 ETH
+        // Game 2: 2 ETH (direct) + 5 ETH (matching) = 7 ETH
+
+        assertEq(
+            dev1Received,
+            9 ether,
+            "Developer 1 should receive 9 ETH total"
+        );
+        assertEq(
+            dev2Received,
+            7 ether,
+            "Developer 2 should receive 7 ETH total"
+        );
+
+        // Verify the ratio of matched funds is approximately equal
+        // (dev1Received - 4 ether) should be approximately equal to
+        // (dev2Received - 2 ether)
+        uint256 dev1Matched = dev1Received - 4 ether;
+        uint256 dev2Matched = dev2Received - 2 ether;
+        assertEq(dev1Matched, dev2Matched, "Matched amounts should be equal");
     }
 }

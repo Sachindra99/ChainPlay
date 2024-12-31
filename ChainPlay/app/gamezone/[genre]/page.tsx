@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import abi from "@/app/abi";
 
 import CardDemo from "@/components/blocks/cards-games";
-const contractAddress = "0x44378e1beefC422568ABa878c74168369e4840C6";
+const contractAddress = "0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000";
 
 interface Game {
   details: string;

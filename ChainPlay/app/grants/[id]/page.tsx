@@ -13,6 +13,7 @@ import {
   useReadContract,
   useWatchContractEvent,
   useWriteContract,
+  useAccount,
 } from "wagmi";
 import {
   Dialog,
@@ -74,7 +75,7 @@ interface Game {
   gameURI: string;
 }
 
-const contractAddress = "0x44378e1beefC422568ABa878c74168369e4840C6";
+const contractAddress = "0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000";
 
 interface CountdownProps {
   startTime: bigint;
@@ -144,6 +145,7 @@ export default function Page({ params }: { params: { id: number } }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const grantId = Number(params.id);
+  const currentAddress = useAccount().address;
 
   const { data } = useReadContract({
     abi: abi,
@@ -185,7 +187,7 @@ export default function Page({ params }: { params: { id: number } }) {
 
   const games = game as Game[] | undefined;
   const grant = data as Grant | undefined;
-  const grantAmountinAia = Number(grant?.totalAmount) / 10 ** 18;
+  const grantAmountInFlow = Number(grant?.totalAmount) / 10 ** 18;
 
   const { writeContractAsync } = useWriteContract();
 
@@ -220,13 +222,13 @@ export default function Page({ params }: { params: { id: number } }) {
                   <ToastAction
                     onClick={() => {
                       window.open(
-                        `https://testnet.aiascan.com/tx/${data}`,
+                        `https://evm-testnet.flowscan.io/tx/${data}`,
                         "_blank"
                       );
                     }}
                     altText="Click Here"
                   >
-                    AIAScan
+                    FlowScan
                   </ToastAction>
                 ),
               });
@@ -313,6 +315,62 @@ export default function Page({ params }: { params: { id: number } }) {
     }
   };
 
+  const finalizeGrant = async () => {
+    try {
+      await writeContractAsync(
+        {
+          address: contractAddress,
+          abi: abi,
+          functionName: "finalizeGrant",
+          args: [grantId + 1],
+        },
+        {
+          onSuccess(data) {
+            console.log("Grant finalized successfully!", data);
+          },
+          onSettled(data, error) {
+            if (error) {
+              console.error("Error on settlement:", error);
+            } else {
+              toast({
+                title: "Success",
+                description: "Grant finalized successfully!",
+                action: (
+                  <ToastAction
+                    onClick={() => {
+                      window.open(
+                        `https://evm-testnet.flowscan.io/tx/${data}`,
+                        "_blank"
+                      );
+                    }}
+                    altText="Click Here"
+                  >
+                    FlowScan
+                  </ToastAction>
+                ),
+              });
+            }
+          },
+          onError(error) {
+            console.error("Finalization error:", error);
+            toast({
+              title: "Error",
+              description: error.message,
+              variant: "destructive",
+            });
+          },
+        }
+      );
+    } catch (error: unknown) {
+      toast({
+        title: "Error",
+        description: "Error finalizing grant",
+        variant: "destructive",
+      });
+      console.error("Error finalizing grant", error);
+    }
+  };
+
   return (
     <FuturisticBackground>
       <div className="container mx-auto px-4 py-8 z-50 flex-col flex">
@@ -329,125 +387,141 @@ export default function Page({ params }: { params: { id: number } }) {
                   onClick={() => router.push("/grants")}
                 />
               </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <HoverBorderGradient onClick={handleDialogOpen}>
-                    <div className="flex items-center">
-                      <PlusCircle className="mr-2" />
-                      Add Game
-                    </div>
+              {Number(grant.duration + grant.startTime) * 1000 < Date.now() ? (
+                grant.creator === currentAddress ? (
+                  <HoverBorderGradient
+                    onClick={() => {
+                      finalizeGrant();
+                    }}
+                  >
+                    <p className="text-white">Finalize Grant</p>
                   </HoverBorderGradient>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add a New Game</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="space-y-4">
-                      <Label htmlFor="gamename">Game Name</Label>
-                      <Controller
-                        name="gameName"
-                        control={control}
-                        render={({ field }) => (
-                          <Input
-                            id="gamename"
-                            placeholder="Game Name"
-                            {...field}
-                          />
-                        )}
-                      />
-
-                      <Label htmlFor="gamedesc">Description</Label>
-                      <Controller
-                        name="gameDetails"
-                        control={control}
-                        render={({ field }) => (
-                          <Input
-                            id="gamedesc"
-                            placeholder="Description"
-                            {...field}
-                          />
-                        )}
-                      />
-
-                      <Controller
-                        control={control}
-                        name="genre"
-                        render={({ field }) => (
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Genre" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">Action</SelectItem>
-                              <SelectItem value="1">Adventure</SelectItem>
-                              <SelectItem value="2">RPG</SelectItem>
-                              <SelectItem value="3">Strategy</SelectItem>
-                              <SelectItem value="4">Sports</SelectItem>
-                              <SelectItem value="5">Puzzle</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-
-                      <Label htmlFor="video">
-                        Upload Video (less than 25MB)
-                      </Label>
-                      <Input
-                        id="video"
-                        type="file"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null;
-                          setVideo(file);
-                        }}
-                      />
-
-                      <Label htmlFor="image">Upload Image</Label>
-                      <Input
-                        id="image"
-                        type="file"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null;
-                          setImage(file);
-                        }}
-                      />
-
-                      <Label htmlFor="game">
-                        Upload Game (.zip less than 25MB)
-                      </Label>
-                      <Input
-                        id="game"
-                        type="file"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null;
-                          setGameZip(file);
-                        }}
-                      />
-                    </div>
-                    <DialogFooter>
-                      <button
-                        type="submit"
-                        disabled={submitLoading}
-                        className="w-full"
-                      >
-                        {submitLoading ? (
-                          <HoverBorderGradient>
-                            <Loader2
-                              className="animate-spin text-white"
-                              size={20}
+                ) : (
+                  <HoverBorderGradient>
+                    <p className="text-white">Grant Ended</p>
+                  </HoverBorderGradient>
+                )
+              ) : (
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <HoverBorderGradient onClick={handleDialogOpen}>
+                      <div className="flex items-center">
+                        <PlusCircle className="mr-2" />
+                        Add Game
+                      </div>
+                    </HoverBorderGradient>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add a New Game</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onSubmit)}>
+                      <div className="space-y-4">
+                        <Label htmlFor="gamename">Game Name</Label>
+                        <Controller
+                          name="gameName"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              id="gamename"
+                              placeholder="Game Name"
+                              {...field}
                             />
-                          </HoverBorderGradient>
-                        ) : (
-                          <HoverBorderGradient>Submit</HoverBorderGradient>
-                        )}
-                      </button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                          )}
+                        />
+
+                        <Label htmlFor="gamedesc">Description</Label>
+                        <Controller
+                          name="gameDetails"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              id="gamedesc"
+                              placeholder="Description"
+                              {...field}
+                            />
+                          )}
+                        />
+
+                        <Controller
+                          control={control}
+                          name="genre"
+                          render={({ field }) => (
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Genre" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">Action</SelectItem>
+                                <SelectItem value="1">Adventure</SelectItem>
+                                <SelectItem value="2">RPG</SelectItem>
+                                <SelectItem value="3">Strategy</SelectItem>
+                                <SelectItem value="4">Sports</SelectItem>
+                                <SelectItem value="5">Puzzle</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+
+                        <Label htmlFor="video">
+                          Upload Video (less than 25MB)
+                        </Label>
+                        <Input
+                          id="video"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setVideo(file);
+                          }}
+                        />
+
+                        <Label htmlFor="image">Upload Image</Label>
+                        <Input
+                          id="image"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setImage(file);
+                          }}
+                        />
+
+                        <Label htmlFor="game">
+                          Upload Game (.zip less than 25MB)
+                        </Label>
+                        <Input
+                          id="game"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setGameZip(file);
+                          }}
+                        />
+                      </div>
+                      <DialogFooter>
+                        <button
+                          type="submit"
+                          disabled={submitLoading}
+                          className="w-full"
+                        >
+                          {submitLoading ? (
+                            <HoverBorderGradient>
+                              <Loader2
+                                className="animate-spin text-white"
+                                size={20}
+                              />
+                            </HoverBorderGradient>
+                          ) : (
+                            <HoverBorderGradient>Submit</HoverBorderGradient>
+                          )}
+                        </button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
             <div className="flex mb-8 gap-6">
               <Image
@@ -471,7 +545,7 @@ export default function Page({ params }: { params: { id: number } }) {
                     Grant Pool :
                   </h2>
                   <h1 className="text-5xl font-bold text-white px-2">
-                    {grantAmountinAia} AIA
+                    {grantAmountInFlow} FLOW
                   </h1>
                 </div>
                 <div>

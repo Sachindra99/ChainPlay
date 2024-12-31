@@ -33,7 +33,7 @@ interface Game {
   grantId: bigint;
 }
 
-const contractAddress = "0x44378e1beefC422568ABa878c74168369e4840C6";
+const contractAddress = "0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000";
 
 export default function Page({ params }: { params: { id: string } }) {
   const [voteLoading, setVoteLoading] = useState(false);
@@ -98,13 +98,13 @@ export default function Page({ params }: { params: { id: string } }) {
                   <ToastAction
                     onClick={() => {
                       window.open(
-                        `https://testnet.aiascan.com/tx/${data}`,
+                        `https://evm-testnet.flowscan.io/tx/${data}`,
                         "_blank"
                       );
                     }}
                     altText="Click Here"
                   >
-                    AIAScan
+                    FlowScan
                   </ToastAction>
                 ),
               });
@@ -191,7 +191,7 @@ export default function Page({ params }: { params: { id: string } }) {
                       Funding Received :
                     </h2>
                     <h1 className="text-5xl font-bold text-white px-2">
-                      {Number(gameData.funding) / 10 ** 18} AIA
+                      {Number(gameData.funding) / 10 ** 18} FLOW
                     </h1>
                   </div>
                   <div>
@@ -256,7 +256,9 @@ function VoteInput({
     <div className="grid gap-4">
       <div className="space-y-2">
         <h4 className="font-medium leading-none">Vote Amount :</h4>
-        <p className="text-sm text-muted-foreground">Enter the Amount in AIA</p>
+        <p className="text-sm text-muted-foreground">
+          Enter the Amount in FLOW
+        </p>
       </div>
       <div className="grid grid-cols-3 items-center gap-4">
         <Input

@@ -39,7 +39,7 @@ const gameSchema = z.object({
 
 type GameFormInputs = z.infer<typeof gameSchema>;
 
-const contractAddress = "0x44378e1beefC422568ABa878c74168369e4840C6";
+const contractAddress = "0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000";
 
 const AddGame = () => {
   const { control, handleSubmit } = useForm<GameFormInputs>({
@@ -101,13 +101,13 @@ const AddGame = () => {
                   <ToastAction
                     onClick={() => {
                       window.open(
-                        `https://testnet.aiascan.com/tx/${data}`,
+                        `https://evm-testnet.flowscan.io/tx/${data}`,
                         "_blank"
                       );
                     }}
                     altText="Click Here"
                   >
-                    AIAScan
+                    FlowScan
                   </ToastAction>
                 ),
               });

@@ -55,6 +55,11 @@ contract GamingGrantPlatform {
         uint256 grantId;
     }
 
+    struct VoteInfo {
+        address voter;
+        uint256 amount;
+    }
+
     /* State variables */
     Counters.Counter private grantIdCounter;
     Counters.Counter private gameIdCounter;
@@ -64,6 +69,7 @@ contract GamingGrantPlatform {
     mapping(address => mapping(uint256 => bool)) private submittedGames;
     mapping(uint256 => mapping(address => uint256)) private votes;
     mapping(uint256 => mapping(address => bool)) private hasVoted;
+    mapping(uint256 => mapping(uint256 => VoteInfo[])) private gameVotes; // grantId => gameId => votes
 
     /* Events */
     event GrantCreated(
@@ -188,11 +194,6 @@ contract GamingGrantPlatform {
         );
     }
 
-    /**
-     * @notice Allows users to vote and fund their favorite game under a specific grant.
-     * @param gameId ID of the game.
-     * @param grantId ID of the grant.
-     */
     function vote(
         uint256 gameId,
         uint256 grantId
@@ -207,13 +208,14 @@ contract GamingGrantPlatform {
         games[gameId].funding += msg.value;
         grants[grantId].totalVotes++;
 
+        // Store individual vote information
+        gameVotes[grantId][gameId].push(
+            VoteInfo({voter: msg.sender, amount: msg.value})
+        );
+
         emit Voted(gameId, msg.sender, msg.value);
     }
 
-    /**
-     * @notice Finalizes the grant after the duration is over and distributes the grant using Quadratic Funding.
-     * @param grantId ID of the grant to be finalized.
-     */
     function finalizeGrant(
         uint256 grantId
     ) external grantExists(grantId) onlyGrantCreator(grantId) {
@@ -224,34 +226,46 @@ contract GamingGrantPlatform {
         );
         require(!grant.finalized, "Grant already finalized");
 
-        uint256 totalFunding = grant.totalAmount;
+        uint256 matchingPoolAmount = grant.totalAmount;
+        uint256[] memory sumOfSqrts = new uint256[](grant.games.length);
+        uint256 totalSumOfSqrts = 0;
 
-        // Ensure there are votes to avoid division by zero
-        if (grant.totalVotes > 0) {
-            // Quadratic funding logic
+        // First pass: Calculate the sum of square roots of contributions for each game
+        for (uint256 i = 0; i < grant.games.length; i++) {
+            uint256 gameId = grant.games[i];
+            VoteInfo[] storage gameVoteInfo = gameVotes[grantId][gameId];
+            uint256 sumOfSqrt = 0;
+
+            // Calculate sum of square roots for each individual contribution
+            for (uint256 j = 0; j < gameVoteInfo.length; j++) {
+                sumOfSqrt += sqrt(gameVoteInfo[j].amount);
+            }
+
+            sumOfSqrt = sumOfSqrt ** 2; // Square the sum of square roots
+            sumOfSqrts[i] = sumOfSqrt;
+            totalSumOfSqrts += sumOfSqrt;
+        }
+
+        // Second pass: Distribute matching funds based on quadratic funding formula
+        if (totalSumOfSqrts > 0) {
             for (uint256 i = 0; i < grant.games.length; i++) {
                 uint256 gameId = grant.games[i];
                 Game storage game = games[gameId];
-                uint256 sumOfSquareRoots;
 
-                // Calculate sum(sqrt(c_i)) for each game's contributions
-                for (uint256 j = 0; j < grant.totalVotes; j++) {
-                    uint256 contribution = votes[grantId][game.developer];
-                    sumOfSquareRoots += sqrt(contribution);
-                }
+                // Calculate matched amount using quadratic funding formula
+                uint256 matchedAmount = (matchingPoolAmount * sumOfSqrts[i]) /
+                    totalSumOfSqrts;
 
-                // Calculate the matched amount using the sum of square roots
-                uint256 matchedAmount = (totalFunding * sumOfSquareRoots) /
-                    grant.totalVotes;
+                // Total funding = direct contributions + matched amount
+                uint256 totalGameFunding = game.funding + matchedAmount;
 
-                // Update the funding and transfer to the developer
-                game.funding += matchedAmount;
-                payable(game.developer).transfer(game.funding);
+                // Transfer the total funding to the developer
+                payable(game.developer).transfer(totalGameFunding);
             }
         }
 
         grant.finalized = true;
-        emit GrantFinalized(grantId, grant.totalVotes, totalFunding);
+        emit GrantFinalized(grantId, grant.totalVotes, matchingPoolAmount);
     }
 
     /**

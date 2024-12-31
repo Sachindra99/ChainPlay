@@ -28,7 +28,7 @@ import { toast } from "@/components/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-const contractAddress = "0x44378e1beefC422568ABa878c74168369e4840C6";
+const contractAddress = "0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000";
 
 // Form schema
 const FormSchema = z.object({
@@ -121,13 +121,13 @@ export default function Component() {
                   <ToastAction
                     onClick={() => {
                       window.open(
-                        `https://testnet.aiascan.com/tx/${data}`,
+                        `https://evm-testnet.flowscan.io/tx/${data}`,
                         "_blank"
                       );
                     }}
                     altText="Click Here"
                   >
-                    AIAScan
+                    FlowScan
                   </ToastAction>
                 ),
               });
@@ -190,7 +190,7 @@ export default function Component() {
         body: imgData,
       });
       const ipfs = await uploadRequest.json();
-
+      console.log("IPFS:", ipfs);
       await submitGrant(data.name, data.amount, data.lastDate, ipfs);
     } else {
       Error("Please upload an image");

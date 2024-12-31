@@ -6,27 +6,27 @@ import {
   } from 'wagmi'
   import {type Chain} from 'viem'
 
-  export const aiaTestnet = {
-    id: 1320,
-    name: 'AIA Testnet',
-    nativeCurrency: { name: 'AIA', symbol: 'AIA', decimals: 18 },
+  export const flowTestnet = {
+    id: 545,
+    name: 'flow Testnet',
+    nativeCurrency: { name: 'FLOW', symbol: 'FLOW', decimals: 18 },
     rpcUrls: {
-      default: { http: ['https://1320.rpc.thirdweb.com/4d60768121e1a305f5ea52158e6cc955'] },
+      default: { http: ['https://testnet.evm.nodes.onflow.org'] },
     },
     blockExplorers: {
-      default: { name: 'aiaScan', url: 'https://testnet.aiascan.com/' },
+      default: { name: 'flowScan', url: 'https://evm-testnet.flowscan.io/' },
     },
   } as const satisfies Chain
   
   export function getConfig() {
     return createConfig({
-      chains: [aiaTestnet],
+      chains: [flowTestnet],
       ssr: true,
       storage: createStorage({
         storage: cookieStorage,
       }),
       transports: {
-        [aiaTestnet.id]: http(),
+        [flowTestnet.id]: http(),
       },
     })
   }

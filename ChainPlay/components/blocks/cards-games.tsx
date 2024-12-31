@@ -76,7 +76,7 @@ export default function CardDemo({
             Votes: {voteCount.toLocaleString()}
           </p>
           <p className="font-normal text-sm text-gray-300 relative z-10">
-            Funds Received: {funding} AIA
+            Funds Received: {funding} FLOW
           </p>
         </div>
       </div>

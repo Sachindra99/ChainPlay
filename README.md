@@ -1,5 +1,5 @@
-AIAScan Contract Link : https://testnet.aiascan.com/address/0x44378e1beefC422568ABa878c74168369e4840C6
-Contract Address : 0x44378e1beefC422568ABa878c74168369e4840C6
+FlowScan Contract Link : https://evm-testnet.flowscan.io/address/0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000
+Contract Address : 0xFfa47E4562D7cc6cDB95a7366E04b644e9DEF000
 
 ![image](https://github.com/user-attachments/assets/2e527e99-48ab-4e9e-ad12-8dcf0d7543af)
 
@@ -13,4 +13,3 @@ User Funding and Voting: Regular users explore the games under different grants 
 Quadratic Funding Allocation: At the conclusion of each grant, ChainPlay utilizes a quadratic funding formula to allocate funds. This method favors projects with broader community support over projects with high individual contributions, balancing influence across small and large donors.
 Decentralized Storage: All data related to ChainPlay, including game details, voting records, and grant information, is securely stored on IPFS. This ensures a high level of data integrity, security, and decentralization, protecting both user and project information.
 Impact and Vision: ChainPlay aims to democratize game development funding, empowering smaller developers and fostering community-driven support for creative ideas. The incorporation of IPFS enhances the security and reliability of the platform, while the quadratic funding formula ensures a fair and equitable distribution of funds.
-
