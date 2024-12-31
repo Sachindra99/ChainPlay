@@ -464,4 +464,4 @@ const abi = [
   { "type": "error", "name": "NotGrantCreator", "inputs": [] },
   { "type": "error", "name": "VotingNotOpen", "inputs": [] }
 ];
-    export default abi
+export default abi
